@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # ====================================================
-# Estilização Visual: Forçar Amarelo + Roxo nas Tags
+# Estilização Visual Completa
 # ====================================================
 st.markdown("""
 <style>
@@ -84,46 +84,40 @@ st.markdown("""
     }
 
     /* ========================================================================== */
-    /* SOBREPOSIÇÃO BLINDADA: TAG SELECIONADA EM AMARELO #F8AE11 COM FONTE ROXA   */
+    /* BLOCO EXCLUSIVO: CORES DAS TAGS SELECIONADAS (MULTISELECT)                 */
     /* ========================================================================== */
-    [data-testid="stSidebar"] [data-baseweb="tag"],
-    [data-testid="stSidebar"] span[data-baseweb="tag"],
-    [data-testid="stSidebar"] div[data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
-    [data-baseweb="select"] [data-baseweb="tag"],
-    [data-baseweb="tag"] {
+
+    /* 1. COR DO FUNDO DA TAG SELECIONADA (AMARELO OFICIAL) */
+    span[data-baseweb="tag"],
+    div[data-baseweb="tag"],
+    [data-baseweb="tag"],
+    [data-baseweb="tag"] > span {
         background-color: #F8AE11 !important;
         background: #F8AE11 !important;
         border: 1px solid #E29B05 !important;
         border-radius: 6px !important;
     }
 
-    [data-testid="stSidebar"] [data-baseweb="tag"] *,
-    [data-testid="stSidebar"] span[data-baseweb="tag"] *,
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"] *,
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
-    [data-baseweb="select"] [data-baseweb="tag"] *,
-    [data-baseweb="tag"] * {
+    /* 2. COR DO TEXTO DA TAG SELECIONADA (ROXO OFICIAL) */
+    span[data-baseweb="tag"] *,
+    div[data-baseweb="tag"] *,
+    [data-baseweb="tag"] *,
+    [data-baseweb="tag"] span {
         color: #460988 !important;
-        fill: #460988 !important;
         font-weight: 800 !important;
         font-size: 0.88rem !important;
     }
 
-    [data-testid="stSidebar"] [data-baseweb="tag"] svg,
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"] svg,
-    [data-baseweb="tag"] svg {
+    /* 3. COR DO ÍCONE "X" (FECHAR TAG) */
+    span[data-baseweb="tag"] svg,
+    div[data-baseweb="tag"] svg,
+    [data-baseweb="tag"] svg,
+    [data-baseweb="tag"] svg path {
         fill: #460988 !important;
         color: #460988 !important;
     }
 
-    [data-testid="stSidebar"] [data-baseweb="tag"] svg:hover,
-    div[data-testid="stMultiSelect"] [data-baseweb="tag"] svg:hover,
-    [data-baseweb="tag"] svg:hover {
-        fill: #24044A !important;
-    }
+    /* ========================================================================== */
 
     [data-testid="stMetric"] {
         background-color: #FFFFFF !important;
@@ -242,56 +236,67 @@ def classificar_genero(nome_completo, valor_coluna_sexo=None):
     return "Não Identificado"
 
 # ====================================================
-# Motor de Filtragem de Telefones (Apenas Celulares)
+# Motor de Filtragem e Classificação de Telefonia
 # ====================================================
 
-def padronizar_telefone_candidato(tel_str, ddd_padrao="63"):
-    if not tel_str:
-        return None
-    digitos = re.sub(r'\D', '', str(tel_str))
-    if not digitos:
-        return None
-        
-    if len(digitos) in (12, 13) and digitos.startswith('55'):
-        digitos = digitos[2:]
-        
-    if len(digitos) == 8:
-        if digitos[0] in ['2', '3', '4', '5']:
-            return None # Fixo
-        if digitos[0] in ['6', '7', '8', '9']:
-            return f"{ddd_padrao}9{digitos}"
-            
-    elif len(digitos) == 9:
-        if digitos.startswith('9'):
-            return f"{ddd_padrao}{digitos}"
-        return None
-        
-    elif len(digitos) == 10:
-        ddd = digitos[:2]
-        corpo = digitos[2:]
-        if corpo[0] in ['2', '3', '4', '5']:
-            return None # Fixo com DDD
-        if corpo[0] in ['6', '7', '8', '9']:
-            return f"{ddd}9{corpo}"
-            
-    elif len(digitos) == 11:
-        if digitos[2] == '9':
-            return digitos
-        return None
-        
-    return None
-
-def selecionar_celular(valor_celula, ddd_padrao="63"):
-    if pd.isna(valor_celula) or not str(valor_celula).strip():
-        return ""
+def classificar_e_extrair_telefones(valor_celula, ddd_padrao="63"):
+    """
+    Analisa a célula inteira de telefones e retorna:
+    (Status: 'Possui Celular' | 'Apenas Fixo' | 'Sem Telefone', Telefone Principal, Telefone Celular)
+    """
+    if not valor_celula or pd.isna(valor_celula) or str(valor_celula).strip() == "" or str(valor_celula).lower() == "nan":
+        return "Sem Telefone", "", ""
         
     candidatos = re.split(r'[,;/|\n\\]', str(valor_celula))
+    
+    celulares = []
+    fixos = []
+    
     for cand in candidatos:
-        resultado = padronizar_telefone_candidato(cand.strip(), ddd_padrao)
-        if resultado:
-            return resultado
+        digitos = re.sub(r'\D', '', cand.strip())
+        if not digitos:
+            continue
             
-    return ""
+        # Remove DDI 55
+        if len(digitos) in (12, 13) and digitos.startswith('55'):
+            digitos = digitos[2:]
+            
+        if len(digitos) == 8:
+            if digitos[0] in ['2', '3', '4', '5']:
+                fixos.append(f"{ddd_padrao}{digitos}")
+            elif digitos[0] in ['6', '7', '8', '9']:
+                celulares.append(f"{ddd_padrao}9{digitos}")
+                
+        elif len(digitos) == 9:
+            if digitos.startswith('9'):
+                celulares.append(f"{ddd_padrao}{digitos}")
+                
+        elif len(digitos) == 10:
+            ddd = digitos[:2]
+            corpo = digitos[2:]
+            if corpo[0] in ['2', '3', '4', '5']:
+                fixos.append(digitos)
+            elif corpo[0] in ['6', '7', '8', '9']:
+                celulares.append(f"{ddd}9{corpo}")
+                
+        elif len(digitos) == 11:
+            if digitos[2] == '9':
+                celulares.append(digitos)
+                
+    if celulares:
+        status = "Possui Celular"
+        tel_principal = celulares[0]
+        tel_celular = celulares[0]
+    elif fixos:
+        status = "Apenas Fixo"
+        tel_principal = fixos[0]
+        tel_celular = ""
+    else:
+        status = "Sem Telefone"
+        tel_principal = ""
+        tel_celular = ""
+        
+    return status, tel_principal, tel_celular
 
 # ====================================================
 # Motor de Filtragem de Bairros (Corte em Q + Unificação)
@@ -571,21 +576,22 @@ def carregar_e_limpar(arquivo):
     col_prof = next((c for c in df.columns if 'PROFIS' in c.upper()), 'PROFISSÃO ELEITOR')
     col_sexo = next((c for c in df.columns if 'SEXO' in c.upper() or 'GENERO' in c.upper() or 'GÊNERO' in c.upper()), None)
 
-    # 1. Seleção Inteligente de Celular
+    # 1. Classificação de Telefonia SEM DESCARTAR LINHAS (Preserva base completa)
     if col_tel:
-        df['TELEFONE_HIGIENIZADO'] = df[col_tel].apply(selecionar_celular)
-        df = df[df['TELEFONE_HIGIENIZADO'] != ""].copy()
+        resultados = df[col_tel].apply(classificar_e_extrair_telefones)
+        df['STATUS_TELEFONE'] = [r[0] for r in resultados]
+        df['TELEFONE_PRINCIPAL'] = [r[1] for r in resultados]
+        df['TELEFONE_CELULAR'] = [r[2] for r in resultados]
     else:
-        df['TELEFONE_HIGIENIZADO'] = ""
-
-    total_com_celular = len(df)
-    descartados = total_inicial - total_com_celular
+        df['STATUS_TELEFONE'] = "Sem Telefone"
+        df['TELEFONE_PRINCIPAL'] = ""
+        df['TELEFONE_CELULAR'] = ""
 
     # 2. Exclusão das colunas solicitadas
     colunas_excluir = ['NUMERO ZONA', 'MUNICIPIO', 'NOME DA MÃE DO ELEITOR', 'NOME DA MAE DO ELEITOR', 'CPF ELEITOR']
     df = df.drop(columns=[col for col in colunas_excluir if col in df.columns], errors='ignore')
 
-    # 3. Processamento dos Bairros
+    # 3. Processamento dos Bairros com Corte da Letra Q
     if col_end in df.columns:
         df['BAIRRO_SETOR'] = df[col_end].apply(processar_bairro)
     else:
@@ -611,25 +617,30 @@ def carregar_e_limpar(arquivo):
     else:
         df['SEXO'] = df['NOME ELEITOR'].apply(classificar_genero)
 
-    return df, total_inicial, descartados
+    return df, total_inicial
 
 # ====================================================
 # Interface Visual (Streamlit)
 # ====================================================
 st.title("🎯 Painel de Segmentação & Filtro de Contatos")
-st.markdown("Filtre contatos com precisão, consulte estatísticas em tempo real e exporte listas prontas.")
+st.markdown("Filtre contatos com precisão, consulte estatísticas completas em tempo real e exporte listas prontas.")
 
 arquivo_upload = st.file_uploader("Selecione sua base de dados (.xlsx ou .csv):", type=['xlsx', 'csv'])
 
 if arquivo_upload is not None:
-    with st.spinner("Filtrando celulares válidos, classificando gênero e aplicando Mapeador de Gurupi..."):
-        df, total_bruto, total_sem_telefone = carregar_e_limpar(arquivo_upload)
+    with st.spinner("Carregando base completa, mapeando telefonia, gênero e bairros..."):
+        df, total_bruto = carregar_e_limpar(arquivo_upload)
 
-    # Indicadores
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total de Linhas no Arquivo", f"{total_bruto:,}")
-    m2.metric("Contatos com Celular Válido", f"{len(df):,}")
-    m3.metric("Descartados (Fixos / Sem Tel.)", f"{total_sem_telefone:,}")
+    # Totalizadores Gerais da Base (Visão 100% Completa)
+    qtd_celular = (df['STATUS_TELEFONE'] == 'Possui Celular').sum()
+    qtd_fixo = (df['STATUS_TELEFONE'] == 'Apenas Fixo').sum()
+    qtd_sem_tel = (df['STATUS_TELEFONE'] == 'Sem Telefone').sum()
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total de Registros", f"{total_bruto:,}")
+    m2.metric("Com Celular Válido", f"{qtd_celular:,}")
+    m3.metric("Apenas Telefone Fixo", f"{qtd_fixo:,}")
+    m4.metric("Sem Telefone", f"{qtd_sem_tel:,}")
 
     # Diagnóstico dos Bairros
     with st.expander("📍 Diagnóstico: Ver, Copiar ou Baixar Lista de Bairros Processados", expanded=False):
@@ -655,6 +666,13 @@ if arquivo_upload is not None:
 
     # Filtros Laterais
     st.sidebar.header("🔍 Filtros de Segmentação")
+
+    # ====================================================
+    # BOTÕES DE CRITÉRIO DE TELEFONIA (SEM DESCARTAR DA BASE)
+    # ====================================================
+    st.sidebar.subheader("📞 Filtros de Telefonia")
+    excluir_sem_telefone = st.sidebar.checkbox("Excluir contatos sem telefone", value=False)
+    excluir_apenas_fixo = st.sidebar.checkbox("Excluir contatos apenas com fixo", value=False)
 
     # Filtro de Bairro
     bairros_ordenados = sorted([b for b in df['BAIRRO_SETOR'].unique() if b not in ["Não Identificado", "Zona Rural", "Centro", "Centro [Estimado]"]])
@@ -697,6 +715,13 @@ if arquivo_upload is not None:
     # Aplicação dos Filtros
     df_filtrado = df.copy()
 
+    # Aplicação dos filtros de telefonia
+    if excluir_sem_telefone:
+        df_filtrado = df_filtrado[df_filtrado['STATUS_TELEFONE'] != 'Sem Telefone']
+    if excluir_apenas_fixo:
+        df_filtrado = df_filtrado[df_filtrado['STATUS_TELEFONE'] != 'Apenas Fixo']
+
+    # Demais filtros
     if sel_bairros:
         df_filtrado = df_filtrado[df_filtrado['BAIRRO_SETOR'].isin(sel_bairros)]
     if sel_sexo:
@@ -719,12 +744,15 @@ if arquivo_upload is not None:
 
     st.markdown("---")
 
-    # Resumo Estatístico
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Base Ativa com Celular", f"{len(df):,} contatos")
-    c2.metric("Total Selecionado", f"{len(df_filtrado):,} contatos")
+    # Resumo Estatístico do Filtro Atual
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Contatos no Filtro", f"{len(df_filtrado):,}")
     pct = (len(df_filtrado) / len(df)) * 100 if len(df) > 0 else 0
-    c3.metric("Representatividade", f"{pct:.2f}%")
+    c2.metric("Representatividade", f"{pct:.2f}%")
+    celulares_no_filtro = (df_filtrado['STATUS_TELEFONE'] == 'Possui Celular').sum()
+    c3.metric("Celulares Selecionados", f"{celulares_no_filtro:,}")
+    fixos_no_filtro = (df_filtrado['STATUS_TELEFONE'] == 'Apenas Fixo').sum()
+    c4.metric("Fixos Selecionados", f"{fixos_no_filtro:,}")
 
     if ativar_filtro_idade:
         if idade_inicial == idade_final:
@@ -734,7 +762,7 @@ if arquivo_upload is not None:
 
     # Tabela Prévia
     st.subheader("📋 Prévia dos Registros Filtrados")
-    df_preview = df_filtrado[['NOME ELEITOR', 'SEXO', 'TELEFONE_HIGIENIZADO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
+    df_preview = df_filtrado[['NOME ELEITOR', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 'SEXO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
     df_preview['IDADE'] = df_preview['IDADE'].apply(lambda x: f"{int(x)} anos" if pd.notna(x) else "Não informada")
     st.dataframe(df_preview.head(100), use_container_width=True)
 
@@ -756,7 +784,7 @@ if arquivo_upload is not None:
         else:
             df_exportar = pd.DataFrame({
                 'NOME': df_filtrado['NOME ELEITOR'].values,
-                'TELEFONE 1': df_filtrado['TELEFONE_HIGIENIZADO'].values,
+                'TELEFONE 1': df_filtrado['TELEFONE_PRINCIPAL'].values,
                 'TELEFONE 2': [''] * len(df_filtrado),
                 'TELEFONE 3': [''] * len(df_filtrado),
                 'LISTA': nome_lista_input.strip(),
