@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # ====================================================
-# Estilização Visual: Tema Claro + Roxo #460988 e Amarelo #F8AE11
+# Estilização Visual: Forçar Amarelo + Roxo nas Tags
 # ====================================================
 st.markdown("""
 <style>
@@ -83,27 +83,46 @@ st.markdown("""
         border-color: #DCD0ED !important;
     }
 
-    /* CAIXA DE FILTRO SELECIONADO: FUNDO AMARELO + FONTE ROXA */
-    span[data-baseweb="tag"],
-    div[data-baseweb="tag"] {
+    /* ========================================================================== */
+    /* SOBREPOSIÇÃO BLINDADA: TAG SELECIONADA EM AMARELO #F8AE11 COM FONTE ROXA   */
+    /* ========================================================================== */
+    [data-testid="stSidebar"] [data-baseweb="tag"],
+    [data-testid="stSidebar"] span[data-baseweb="tag"],
+    [data-testid="stSidebar"] div[data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
+    [data-baseweb="select"] [data-baseweb="tag"],
+    [data-baseweb="tag"] {
         background-color: #F8AE11 !important;
+        background: #F8AE11 !important;
         border: 1px solid #E29B05 !important;
         border-radius: 6px !important;
-        padding: 4px 8px !important;
     }
-    span[data-baseweb="tag"] *,
-    div[data-baseweb="tag"] * {
+
+    [data-testid="stSidebar"] [data-baseweb="tag"] *,
+    [data-testid="stSidebar"] span[data-baseweb="tag"] *,
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] *,
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
+    [data-baseweb="select"] [data-baseweb="tag"] *,
+    [data-baseweb="tag"] * {
         color: #460988 !important;
-        font-weight: 700 !important;
+        fill: #460988 !important;
+        font-weight: 800 !important;
         font-size: 0.88rem !important;
     }
-    span[data-baseweb="tag"] svg,
-    div[data-baseweb="tag"] svg {
+
+    [data-testid="stSidebar"] [data-baseweb="tag"] svg,
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] svg,
+    [data-baseweb="tag"] svg {
         fill: #460988 !important;
+        color: #460988 !important;
     }
-    span[data-baseweb="tag"] svg:hover,
-    div[data-baseweb="tag"] svg:hover {
-        fill: #27044D !important;
+
+    [data-testid="stSidebar"] [data-baseweb="tag"] svg:hover,
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] svg:hover,
+    [data-baseweb="tag"] svg:hover {
+        fill: #24044A !important;
     }
 
     [data-testid="stMetric"] {
@@ -188,11 +207,6 @@ EXCECOES_MASCULINAS = {
 }
 
 def classificar_genero(nome_completo, valor_coluna_sexo=None):
-    """
-    Identifica o gênero:
-    1. Se houver coluna de Sexo/Gênero na planilha, padroniza.
-    2. Caso contrário, classifica com base no primeiro nome do eleitor.
-    """
     if valor_coluna_sexo is not None and pd.notna(valor_coluna_sexo):
         v = str(valor_coluna_sexo).strip().upper()
         if v in ['M', 'MASC', 'MASCULINO', 'HOMEM']:
@@ -209,19 +223,16 @@ def classificar_genero(nome_completo, valor_coluna_sexo=None):
         
     p_nome = partes[0]
     
-    # Checagem em tabelas de nomes
     if p_nome in EXCECOES_MASCULINAS:
         return "Masculino"
     if p_nome in EXCECOES_FEMININAS:
         return "Feminino"
         
-    # Nomes compostos fortes
     if p_nome in ['MARIA', 'ANA']:
         return "Feminino"
     if p_nome in ['JOAO', 'JOSE', 'FRANCISCO']:
         return "Masculino"
         
-    # Heurísticas de terminações típicas do português
     if p_nome.endswith(('INA', 'ANA', 'ELA', 'AIA', 'ARA', 'ETE', 'ICE', 'ISE', 'ELLE', 'IELE', 'IA', 'CA', 'DA', 'GA', 'LA', 'MA', 'NA', 'PA', 'RA', 'SA', 'TA', 'VA', 'ZA', 'A')):
         return "Feminino"
         
@@ -658,7 +669,7 @@ if arquivo_upload is not None:
 
     sel_bairros = st.sidebar.multiselect("Bairro / Região:", options=bairros_ordenados)
 
-    # NOVO FILTRO: Sexo / Gênero
+    # Filtro de Sexo / Gênero
     opcoes_sexo = [s for s in ['Feminino', 'Masculino', 'Não Identificado'] if s in df['SEXO'].values]
     sel_sexo = st.sidebar.multiselect("Sexo / Gênero:", options=opcoes_sexo)
 
@@ -721,7 +732,7 @@ if arquivo_upload is not None:
         else:
             st.info(f"📊 Filtrando eleitores de **{idade_inicial} a {idade_final} anos**: **{len(df_filtrado)} pessoas** encontradas.")
 
-    # Tabela Prévia (Exibe também o Sexo/Gênero)
+    # Tabela Prévia
     st.subheader("📋 Prévia dos Registros Filtrados")
     df_preview = df_filtrado[['NOME ELEITOR', 'SEXO', 'TELEFONE_HIGIENIZADO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
     df_preview['IDADE'] = df_preview['IDADE'].apply(lambda x: f"{int(x)} anos" if pd.notna(x) else "Não informada")
