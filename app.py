@@ -83,9 +83,7 @@ st.markdown("""
         border-color: #DCD0ED !important;
     }
 
-    /* ======================================================== */
-    /* CAIXA DE FILTRO SELECIONADO: FUNDO AMARELO + FONTE ROXA  */
-    /* ======================================================== */
+    /* CAIXA DE FILTRO SELECIONADO: FUNDO AMARELO + FONTE ROXA */
     span[data-baseweb="tag"],
     div[data-baseweb="tag"] {
         background-color: #F8AE11 !important;
@@ -155,53 +153,117 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ====================================================
+# Motor de Identificação de Sexo / Gênero
+# ====================================================
+
+EXCECOES_FEMININAS = {
+    'ABADIA', 'ALICE', 'BEATRIZ', 'CARMEM', 'CARMEN', 'CLEIDE', 'CLOE', 'DAIANE', 'DAIANI',
+    'DAYANE', 'DAYANI', 'DENISE', 'DIANE', 'DORIS', 'EDITE', 'EDITH', 'ELEN', 'ELIS', 'ELIZABETH',
+    'ELIZETE', 'EMANUELLE', 'ESTER', 'ESTHER', 'EUNICE', 'FRANCOISE', 'GLEICE', 'GLEICI',
+    'GRACE', 'HELEN', 'HELOISE', 'INEZ', 'INÊS', 'IRIS', 'ISABEL', 'ISABELE', 'ISABELLA',
+    'ISABELLE', 'IVETE', 'IVONE', 'JAQUELINE', 'JANETE', 'JOCELENE', 'JOCELYN', 'JOELMA',
+    'JOSIANE', 'JOYCE', 'JUDITE', 'JULIANE', 'KAREN', 'KATIA', 'KELLY', 'LAIS', 'LARISSA',
+    'LEIDE', 'LIDIANE', 'LILIAN', 'LILIANE', 'LIS', 'LIZ', 'LOURDES', 'LUCIANE', 'LUCIELE',
+    'LUCIENE', 'LUCIMAR', 'LUDMILA', 'LUZIA', 'MADALENA', 'MAIRA', 'MANUELA', 'MARA',
+    'MARCELA', 'MARCIA', 'MARGARETE', 'MARI', 'MARIA', 'MARIENE', 'MARILENE', 'MARILU',
+    'MARINA', 'MARISA', 'MARISTELA', 'MARIZE', 'MARLENE', 'MARLI', 'MARLY', 'MIRIAM',
+    'MIRIAN', 'MONICA', 'NADIR', 'NAIR', 'NAIRA', 'NEIDE', 'NICOLE', 'NOEMI', 'RAQUEL',
+    'REGINA', 'ROBERTA', 'ROSE', 'ROSEANE', 'ROSELI', 'ROSEMARY', 'ROSILENE', 'RUTE', 'RUTH',
+    'SALETE', 'SHIRLEY', 'SIMONE', 'SIRLEI', 'SIRLENE', 'SOLANGE', 'SONIA', 'SUELI', 'SUELY',
+    'SUZANA', 'TAIS', 'THAIS', 'TATIANE', 'TEREZA', 'VALDENICE', 'VALERIA', 'VANDETE',
+    'VANESSA', 'VERA', 'VIVIAN', 'VIVIANE', 'YASMIN', 'ZILDA', 'ZILMA', 'ZULEICA', 'ZULEIDE'
+}
+
+EXCECOES_MASCULINAS = {
+    'JEAN', 'LUCA', 'LUKA', 'SASHA', 'ANDRE', 'ALEXANDRE', 'FELIPE', 'GUILHERME', 'HENRIQUE',
+    'JORGE', 'VICENTE', 'VALDIR', 'WAGNER', 'VAGNER', 'ALTAIR', 'ADEMIR', 'VALMIR', 'WALMIR',
+    'MOACIR', 'MOACYR', 'ODAIR', 'ELIEZER', 'VALTER', 'WALTER', 'HEITOR', 'VICTOR', 'VITOR',
+    'IGOR', 'ARTHUR', 'ARTUR', 'CESAR', 'CEZAR', 'EDER', 'ELDER', 'JUNIOR', 'LUCAS', 'MATHEUS',
+    'MATEUS', 'MARCOS', 'VINICIUS', 'LUIS', 'LUIZ', 'CARLOS', 'ELIAS', 'JONAS', 'TOMAS', 'THOMAS',
+    'NILSON', 'EDILSON', 'ADILSON', 'GILSON', 'JAILSON', 'DENILSON', 'CLEITON', 'CLAYTON',
+    'WELLINGTON', 'WASHINGTON', 'EVERTON', 'EMERSON', 'EDSON', 'ANDERSON', 'JEFFERSON', 'ROBSON',
+    'ALISON', 'ALISSON', 'GABRIEL', 'RAFAEL', 'DANIEL', 'SAMUEL', 'MICHAEL', 'MIGUEL', 'MANOEL',
+    'MANUEL', 'JOEL', 'NOEL', 'URIEL', 'ISMAEL', 'ISRAEL', 'NATANIEL', 'EZEQUIEL', 'MARCELLUS',
+    'ABENDEGO', 'TIAGO', 'THIAGO', 'DIOGO', 'RODRIGO', 'DIEGO', 'HUGO', 'BRUNO', 'LEONARDO'
+}
+
+def classificar_genero(nome_completo, valor_coluna_sexo=None):
+    """
+    Identifica o gênero:
+    1. Se houver coluna de Sexo/Gênero na planilha, padroniza.
+    2. Caso contrário, classifica com base no primeiro nome do eleitor.
+    """
+    if valor_coluna_sexo is not None and pd.notna(valor_coluna_sexo):
+        v = str(valor_coluna_sexo).strip().upper()
+        if v in ['M', 'MASC', 'MASCULINO', 'HOMEM']:
+            return "Masculino"
+        if v in ['F', 'FEM', 'FEMININO', 'MULHER']:
+            return "Feminino"
+
+    if not nome_completo or pd.isna(nome_completo):
+        return "Não Identificado"
+        
+    partes = remover_acentos(nome_completo).split()
+    if not partes:
+        return "Não Identificado"
+        
+    p_nome = partes[0]
+    
+    # Checagem em tabelas de nomes
+    if p_nome in EXCECOES_MASCULINAS:
+        return "Masculino"
+    if p_nome in EXCECOES_FEMININAS:
+        return "Feminino"
+        
+    # Nomes compostos fortes
+    if p_nome in ['MARIA', 'ANA']:
+        return "Feminino"
+    if p_nome in ['JOAO', 'JOSE', 'FRANCISCO']:
+        return "Masculino"
+        
+    # Heurísticas de terminações típicas do português
+    if p_nome.endswith(('INA', 'ANA', 'ELA', 'AIA', 'ARA', 'ETE', 'ICE', 'ISE', 'ELLE', 'IELE', 'IA', 'CA', 'DA', 'GA', 'LA', 'MA', 'NA', 'PA', 'RA', 'SA', 'TA', 'VA', 'ZA', 'A')):
+        return "Feminino"
+        
+    if p_nome.endswith(('O', 'OS', 'OR', 'ER', 'EL', 'ON', 'SON', 'TON', 'IO', 'DO', 'TO', 'US', 'ES', 'EU', 'AO', 'IM', 'UR', 'IR', 'AS', 'IS', 'UZ')):
+        return "Masculino"
+        
+    return "Não Identificado"
+
+# ====================================================
 # Motor de Filtragem de Telefones (Apenas Celulares)
 # ====================================================
 
 def padronizar_telefone_candidato(tel_str, ddd_padrao="63"):
-    """
-    Verifica se um número individual é celular válido e aplica formatação.
-    Descarta telefones fixos (iniciados em 2, 3, 4, 5, ex: 33... ou 6333...).
-    """
     if not tel_str:
         return None
     digitos = re.sub(r'\D', '', str(tel_str))
     if not digitos:
         return None
         
-    # Remove DDI 55 se houver
     if len(digitos) in (12, 13) and digitos.startswith('55'):
         digitos = digitos[2:]
         
-    # 8 dígitos locais
     if len(digitos) == 8:
-        # Fixo em Gurupi / Brasil (inicia em 2, 3, 4, 5, ex: 3312-3456)
         if digitos[0] in ['2', '3', '4', '5']:
-            return None
-        # Celular de 8 dígitos (inicia em 6, 7, 8, 9): adiciona DDD e 9º dígito
+            return None # Fixo
         if digitos[0] in ['6', '7', '8', '9']:
             return f"{ddd_padrao}9{digitos}"
             
-    # 9 dígitos locais (celular moderno sem DDD)
     elif len(digitos) == 9:
         if digitos.startswith('9'):
             return f"{ddd_padrao}{digitos}"
         return None
         
-    # 10 dígitos (DDD + 8 dígitos)
     elif len(digitos) == 10:
         ddd = digitos[:2]
         corpo = digitos[2:]
-        # Fixo com DDD (ex: 6333123456): descarta
         if corpo[0] in ['2', '3', '4', '5']:
-            return None
-        # Celular antigo com DDD: insere o 9º dígito
+            return None # Fixo com DDD
         if corpo[0] in ['6', '7', '8', '9']:
             return f"{ddd}9{corpo}"
             
-    # 11 dígitos (DDD + 9 dígitos)
     elif len(digitos) == 11:
-        # No Brasil, todo celular válido possui '9' após o DDD (3º dígito)
         if digitos[2] == '9':
             return digitos
         return None
@@ -209,16 +271,10 @@ def padronizar_telefone_candidato(tel_str, ddd_padrao="63"):
     return None
 
 def selecionar_celular(valor_celula, ddd_padrao="63"):
-    """
-    Analisa a célula inteira. Se contiver múltiplos números (ex: um fixo e um celular),
-    ignora os fixos e seleciona o primeiro número celular válido encontrado.
-    """
     if pd.isna(valor_celula) or not str(valor_celula).strip():
         return ""
         
-    # Divide por múltiplos delimitadores usuais
     candidatos = re.split(r'[,;/|\n\\]', str(valor_celula))
-    
     for cand in candidatos:
         resultado = padronizar_telefone_candidato(cand.strip(), ddd_padrao)
         if resultado:
@@ -238,7 +294,6 @@ def remover_acentos(texto):
     return re.sub(r'\s+', ' ', texto).strip().upper()
 
 def cortar_em_q(cand):
-    """Corta a string a partir da primeira palavra iniciada com Q (Quadras, Q, Qd, etc.)"""
     if not cand:
         return ""
     cand = str(cand).strip()
@@ -348,7 +403,6 @@ RUAS_CENTRAIS_GURUPI = [
     'DEPUTADO JOSE DE ASSIS'
 ]
 
-# Construção do Mapa com Corte em Q
 mapa_final = {}
 todos_padroes_ordenados = []
 
@@ -396,12 +450,10 @@ def processar_bairro(endereco_raw):
     end_limpo = re.sub(r'[\(\)\[\]\{\}\"\']', ' ', end)
     end_norm = remover_acentos(end_limpo)
     
-    # 0. Zona Rural
     if re.search(r'\b(?:FAZENDA|FAZ\.?|FAZ\b|ZONA\s+RURAL|SITIO|CHACARA|CH\.?|GLEBA|ASSENTAMENTO|POVOADO)\b', end_norm):
         if not re.search(r'\b(?:SETOR|ST\.?|BAIRRO|JARDIM|JD\.?|RESIDENCIAL|RES\.?)\s+(?:CHACARA|FAZENDA)', end_norm):
             return "Zona Rural"
             
-    # 1. Extração inicial do candidato e corte em Q
     cand = ""
     m = re.search(r'\b(?:bairro|st\.?|setor|jardim|jd\.?|pq\.?|parque|vila|vl\.?|res\.?|residencial)\s+([A-Za-z0-9\s\-]+)', end_limpo, re.IGNORECASE)
     if m:
@@ -421,7 +473,6 @@ def processar_bairro(endereco_raw):
     
     res_bairro = None
     
-    # 2. Unificação
     if cand_norm in mapa_final:
         res_bairro = mapa_final[cand_norm]
     elif cand_norm:
@@ -456,7 +507,6 @@ def processar_bairro(endereco_raw):
     if cand_norm in set_nao_id or end_cut_norm in set_nao_id:
         res_bairro = None
 
-    # 3. Mapeador Urbano Local de Gurupi
     eh_residencial = (res_bairro and remover_acentos(res_bairro) in set_residenciais)
     
     if not res_bairro or eh_residencial:
@@ -508,8 +558,9 @@ def carregar_e_limpar(arquivo):
     col_nasc = next((c for c in df.columns if 'NASC' in c.upper()), 'DATA NASCIMENTO ELEITOR')
     col_nome = next((c for c in df.columns if 'NOME ELEITOR' in c.upper() or ('NOME' in c.upper() and 'MÃE' not in c.upper() and 'MAE' not in c.upper())), 'NOME ELEITOR')
     col_prof = next((c for c in df.columns if 'PROFIS' in c.upper()), 'PROFISSÃO ELEITOR')
+    col_sexo = next((c for c in df.columns if 'SEXO' in c.upper() or 'GENERO' in c.upper() or 'GÊNERO' in c.upper()), None)
 
-    # 1. Seleção Inteligente de Celular (Descarta quem só tem fixo ou sem número)
+    # 1. Seleção Inteligente de Celular
     if col_tel:
         df['TELEFONE_HIGIENIZADO'] = df[col_tel].apply(selecionar_celular)
         df = df[df['TELEFONE_HIGIENIZADO'] != ""].copy()
@@ -523,7 +574,7 @@ def carregar_e_limpar(arquivo):
     colunas_excluir = ['NUMERO ZONA', 'MUNICIPIO', 'NOME DA MÃE DO ELEITOR', 'NOME DA MAE DO ELEITOR', 'CPF ELEITOR']
     df = df.drop(columns=[col for col in colunas_excluir if col in df.columns], errors='ignore')
 
-    # 3. Processamento dos Bairros com Corte da Letra Q nos Filtros e Endereços
+    # 3. Processamento dos Bairros
     if col_end in df.columns:
         df['BAIRRO_SETOR'] = df[col_end].apply(processar_bairro)
     else:
@@ -543,6 +594,12 @@ def carregar_e_limpar(arquivo):
     if col_nome in df.columns and col_nome != 'NOME ELEITOR':
         df['NOME ELEITOR'] = df[col_nome]
 
+    # 5. Classificação de Sexo / Gênero
+    if col_sexo:
+        df['SEXO'] = df.apply(lambda r: classificar_genero(r['NOME ELEITOR'], r[col_sexo]), axis=1)
+    else:
+        df['SEXO'] = df['NOME ELEITOR'].apply(classificar_genero)
+
     return df, total_inicial, descartados
 
 # ====================================================
@@ -554,7 +611,7 @@ st.markdown("Filtre contatos com precisão, consulte estatísticas em tempo real
 arquivo_upload = st.file_uploader("Selecione sua base de dados (.xlsx ou .csv):", type=['xlsx', 'csv'])
 
 if arquivo_upload is not None:
-    with st.spinner("Filtrando celulares válidos, aplicando corte em Q e Mapeador de Gurupi..."):
+    with st.spinner("Filtrando celulares válidos, classificando gênero e aplicando Mapeador de Gurupi..."):
         df, total_bruto, total_sem_telefone = carregar_e_limpar(arquivo_upload)
 
     # Indicadores
@@ -563,7 +620,7 @@ if arquivo_upload is not None:
     m2.metric("Contatos com Celular Válido", f"{len(df):,}")
     m3.metric("Descartados (Fixos / Sem Tel.)", f"{total_sem_telefone:,}")
 
-    # Diagnóstico e Cópia dos Bairros
+    # Diagnóstico dos Bairros
     with st.expander("📍 Diagnóstico: Ver, Copiar ou Baixar Lista de Bairros Processados", expanded=False):
         df_bairros = df['BAIRRO_SETOR'].value_counts().reset_index()
         df_bairros.columns = ['Bairro / Região', 'Total de Contatos']
@@ -588,8 +645,8 @@ if arquivo_upload is not None:
     # Filtros Laterais
     st.sidebar.header("🔍 Filtros de Segmentação")
 
+    # Filtro de Bairro
     bairros_ordenados = sorted([b for b in df['BAIRRO_SETOR'].unique() if b not in ["Não Identificado", "Zona Rural", "Centro", "Centro [Estimado]"]])
-    
     if "Centro" in df['BAIRRO_SETOR'].values:
         bairros_ordenados.insert(0, "Centro")
     if "Centro [Estimado]" in df['BAIRRO_SETOR'].values:
@@ -601,6 +658,11 @@ if arquivo_upload is not None:
 
     sel_bairros = st.sidebar.multiselect("Bairro / Região:", options=bairros_ordenados)
 
+    # NOVO FILTRO: Sexo / Gênero
+    opcoes_sexo = [s for s in ['Feminino', 'Masculino', 'Não Identificado'] if s in df['SEXO'].values]
+    sel_sexo = st.sidebar.multiselect("Sexo / Gênero:", options=opcoes_sexo)
+
+    # Filtro de Profissão
     profissoes_disponiveis = sorted(df['PROFISSÃO ELEITOR'].unique())
     sel_profissoes = st.sidebar.multiselect("Profissão:", options=profissoes_disponiveis)
 
@@ -626,6 +688,8 @@ if arquivo_upload is not None:
 
     if sel_bairros:
         df_filtrado = df_filtrado[df_filtrado['BAIRRO_SETOR'].isin(sel_bairros)]
+    if sel_sexo:
+        df_filtrado = df_filtrado[df_filtrado['SEXO'].isin(sel_sexo)]
     if sel_profissoes:
         df_filtrado = df_filtrado[df_filtrado['PROFISSÃO ELEITOR'].isin(sel_profissoes)]
 
@@ -657,9 +721,9 @@ if arquivo_upload is not None:
         else:
             st.info(f"📊 Filtrando eleitores de **{idade_inicial} a {idade_final} anos**: **{len(df_filtrado)} pessoas** encontradas.")
 
-    # Tabela Prévia
+    # Tabela Prévia (Exibe também o Sexo/Gênero)
     st.subheader("📋 Prévia dos Registros Filtrados")
-    df_preview = df_filtrado[['NOME ELEITOR', 'TELEFONE_HIGIENIZADO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
+    df_preview = df_filtrado[['NOME ELEITOR', 'SEXO', 'TELEFONE_HIGIENIZADO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
     df_preview['IDADE'] = df_preview['IDADE'].apply(lambda x: f"{int(x)} anos" if pd.notna(x) else "Não informada")
     st.dataframe(df_preview.head(100), use_container_width=True)
 
@@ -669,7 +733,7 @@ if arquivo_upload is not None:
 
     col_nome_lista, col_marcador = st.columns(2)
     with col_nome_lista:
-        nome_lista_input = st.text_input("Qual o nome desta LISTA? (Ex: advogados, centro, etc.):", value="")
+        nome_lista_input = st.text_input("Qual o nome desta LISTA? (Ex: mulheres_vila_nova, advogados, etc.):", value="")
     with col_marcador:
         st.text_input("MARCADOR:", value="ListaE", disabled=True)
 
