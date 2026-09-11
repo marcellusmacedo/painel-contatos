@@ -23,7 +23,7 @@ if not os.path.exists(config_path) or open(config_path, encoding="utf-8").read()
         f.write(config_content)
 
 st.set_page_config(
-    page_title="Painel de Segmentação de Eleitores",
+    page_title="Painel de Segmentação de Contatos",
     page_icon="📊",
     layout="wide"
 )
@@ -200,6 +200,13 @@ EXCECOES_MASCULINAS = {
     'ABENDEGO', 'TIAGO', 'THIAGO', 'DIOGO', 'RODRIGO', 'DIEGO', 'HUGO', 'BRUNO', 'LEONARDO'
 }
 
+def remover_acentos(texto):
+    if not texto:
+        return ""
+    texto = unicodedata.normalize('NFD', str(texto))
+    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+    return re.sub(r'\s+', ' ', texto).strip().upper()
+
 def classificar_genero(nome_completo, valor_coluna_sexo=None):
     if valor_coluna_sexo is not None and pd.notna(valor_coluna_sexo):
         v = str(valor_coluna_sexo).strip().upper()
@@ -305,13 +312,6 @@ def classificar_e_extrair_telefones(valor_celula, ddd_padrao="63"):
 # ====================================================
 # Motor de Filtragem de Bairros (Corte em Q + Unificação)
 # ====================================================
-
-def remover_acentos(texto):
-    if not texto:
-        return ""
-    texto = unicodedata.normalize('NFD', str(texto))
-    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
-    return re.sub(r'\s+', ' ', texto).strip().upper()
 
 def cortar_em_q(cand):
     if not cand:
@@ -573,11 +573,11 @@ def carregar_e_limpar(arquivo):
 
     total_inicial = len(df)
 
-    col_tel = next((c for c in df.columns if 'TELEFONE' in c.upper()), None)
-    col_end = next((c for c in df.columns if 'ENDERE' in c.upper()), 'ENDEREÇO ELEITOR')
-    col_nasc = next((c for c in df.columns if 'NASC' in c.upper()), 'DATA NASCIMENTO ELEITOR')
-    col_nome = next((c for c in df.columns if 'NOME ELEITOR' in c.upper() or ('NOME' in c.upper() and 'MÃE' not in c.upper() and 'MAE' not in c.upper())), 'NOME ELEITOR')
-    col_prof = next((c for c in df.columns if 'PROFIS' in c.upper()), 'PROFISSÃO ELEITOR')
+    col_tel = next((c for c in df.columns if 'TELEFONE' in c.upper() or 'TEL' in c.upper() or 'CEL' in c.upper()), None)
+    col_end = next((c for c in df.columns if 'ENDERE' in c.upper()), None)
+    col_nasc = next((c for c in df.columns if 'NASC' in c.upper()), None)
+    col_nome = next((c for c in df.columns if 'NOME' in c.upper() and 'MÃE' not in c.upper() and 'MAE' not in c.upper()), None)
+    col_prof = next((c for c in df.columns if 'PROFIS' in c.upper()), None)
     col_sexo = next((c for c in df.columns if 'SEXO' in c.upper() or 'GENERO' in c.upper() or 'GÊNERO' in c.upper()), None)
 
     # 1. Classificação de Telefonia SEM DESCARTAR LINHAS (Preserva base completa)
@@ -591,35 +591,38 @@ def carregar_e_limpar(arquivo):
         df['TELEFONE_PRINCIPAL'] = ""
         df['TELEFONE_CELULAR'] = ""
 
-    # 2. Exclusão das colunas solicitadas
-    colunas_excluir = ['NUMERO ZONA', 'MUNICIPIO', 'NOME DA MÃE DO ELEITOR', 'NOME DA MAE DO ELEITOR', 'CPF ELEITOR']
+    # 2. Exclusão de colunas desnecessárias
+    colunas_excluir = ['NUMERO ZONA', 'MUNICIPIO', 'NOME DA MÃE DO ELEITOR', 'NOME DA MAE DO ELEITOR', 'CPF ELEITOR', 'TITULO ELEITORAL', 'ZONA', 'SECAO']
     df = df.drop(columns=[col for col in colunas_excluir if col in df.columns], errors='ignore')
 
     # 3. Processamento dos Bairros com Corte da Letra Q
-    if col_end in df.columns:
+    if col_end and col_end in df.columns:
         df['BAIRRO_SETOR'] = df[col_end].apply(processar_bairro)
     else:
         df['BAIRRO_SETOR'] = "Não Identificado"
 
-    # 4. Idade Numérica e Profissão
-    if col_nasc in df.columns:
+    # 4. Idade Numérica
+    if col_nasc and col_nasc in df.columns:
         df['IDADE'] = df[col_nasc].apply(calcular_idade_exata)
     else:
         df['IDADE'] = None
 
-    if col_prof in df.columns:
-        df['PROFISSÃO ELEITOR'] = df[col_prof].fillna('NÃO INFORMADO').str.strip().str.upper()
+    # 5. Nome e Profissão Padronizados de Forma Neutra
+    if col_nome and col_nome in df.columns:
+        df['NOME'] = df[col_nome].fillna('').astype(str).str.strip()
     else:
-        df['PROFISSÃO ELEITOR'] = 'NÃO INFORMADO'
+        df['NOME'] = 'NÃO INFORMADO'
 
-    if col_nome in df.columns and col_nome != 'NOME ELEITOR':
-        df['NOME ELEITOR'] = df[col_nome]
-
-    # 5. Classificação de Sexo / Gênero
-    if col_sexo:
-        df['SEXO'] = df.apply(lambda r: classificar_genero(r['NOME ELEITOR'], r[col_sexo]), axis=1)
+    if col_prof and col_prof in df.columns:
+        df['PROFISSÃO'] = df[col_prof].fillna('NÃO INFORMADO').astype(str).str.strip().str.upper()
     else:
-        df['SEXO'] = df['NOME ELEITOR'].apply(classificar_genero)
+        df['PROFISSÃO'] = 'NÃO INFORMADO'
+
+    # 6. Classificação de Sexo / Gênero
+    if col_sexo and col_sexo in df.columns:
+        df['SEXO'] = df.apply(lambda r: classificar_genero(r['NOME'], r[col_sexo]), axis=1)
+    else:
+        df['SEXO'] = df['NOME'].apply(classificar_genero)
 
     return df, total_inicial
 
@@ -694,7 +697,7 @@ if arquivo_upload is not None:
     sel_sexo = st.sidebar.multiselect("Sexo / Gênero:", options=opcoes_sexo)
 
     # Filtro de Profissão
-    profissoes_disponiveis = sorted(df['PROFISSÃO ELEITOR'].unique())
+    profissoes_disponiveis = sorted(df['PROFISSÃO'].unique())
     sel_profissoes = st.sidebar.multiselect("Profissão:", options=profissoes_disponiveis)
 
     # Filtro Numérico de Idade
@@ -712,7 +715,7 @@ if arquivo_upload is not None:
     ativar_filtro_idade = st.sidebar.checkbox("Ativar filtro de idade", value=False)
     incluir_sem_idade = st.sidebar.checkbox("Incluir contatos sem data informada", value=False)
 
-    termo_busca = st.sidebar.text_input("Buscar por Nome do Eleitor:")
+    termo_busca = st.sidebar.text_input("Buscar por Nome:")
 
     # Aplicação dos Filtros
     df_filtrado = df.copy()
@@ -729,7 +732,7 @@ if arquivo_upload is not None:
     if sel_sexo:
         df_filtrado = df_filtrado[df_filtrado['SEXO'].isin(sel_sexo)]
     if sel_profissoes:
-        df_filtrado = df_filtrado[df_filtrado['PROFISSÃO ELEITOR'].isin(sel_profissoes)]
+        df_filtrado = df_filtrado[df_filtrado['PROFISSÃO'].isin(sel_profissoes)]
 
     if ativar_filtro_idade:
         if idade_inicial > idade_final:
@@ -742,7 +745,7 @@ if arquivo_upload is not None:
                 df_filtrado = df_filtrado[condicao_idade]
 
     if termo_busca:
-        df_filtrado = df_filtrado[df_filtrado['NOME ELEITOR'].str.contains(termo_busca, case=False, na=False)]
+        df_filtrado = df_filtrado[df_filtrado['NOME'].str.contains(termo_busca, case=False, na=False)]
 
     st.markdown("---")
 
@@ -758,13 +761,13 @@ if arquivo_upload is not None:
 
     if ativar_filtro_idade:
         if idade_inicial == idade_final:
-            st.info(f"📊 Filtrando eleitores com exatamente **{idade_inicial} anos**: **{len(df_filtrado)} pessoas** encontradas.")
+            st.info(f"📊 Filtrando registros com exatamente **{idade_inicial} anos**: **{len(df_filtrado)} pessoas** encontradas.")
         else:
-            st.info(f"📊 Filtrando eleitores de **{idade_inicial} a {idade_final} anos**: **{len(df_filtrado)} pessoas** encontradas.")
+            st.info(f"📊 Filtrando registros de **{idade_inicial} a {idade_final} anos**: **{len(df_filtrado)} pessoas** encontradas.")
 
     # Tabela Prévia
     st.subheader("📋 Prévia dos Registros Filtrados")
-    df_preview = df_filtrado[['NOME ELEITOR', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 'SEXO', 'PROFISSÃO ELEITOR', 'BAIRRO_SETOR', 'IDADE']].copy()
+    df_preview = df_filtrado[['NOME', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 'SEXO', 'PROFISSÃO', 'BAIRRO_SETOR', 'IDADE']].copy()
     df_preview['IDADE'] = df_preview['IDADE'].apply(lambda x: f"{int(x)} anos" if pd.notna(x) else "Não informada")
     st.dataframe(df_preview.head(100), use_container_width=True)
 
@@ -774,7 +777,7 @@ if arquivo_upload is not None:
 
     col_nome_lista, col_marcador = st.columns(2)
     with col_nome_lista:
-        nome_lista_input = st.text_input("Qual o nome desta LISTA? (Ex: mulheres_vila_nova, advogados, etc.):", value="")
+        nome_lista_input = st.text_input("Qual o nome desta LISTA? (Ex: contatos_mulheres, advogados, etc.):", value="")
     with col_marcador:
         st.text_input("MARCADOR:", value="ListaE", disabled=True)
 
@@ -788,7 +791,7 @@ if arquivo_upload is not None:
             telefones_export = df_filtrado['TELEFONE_CELULAR'].where(df_filtrado['TELEFONE_CELULAR'] != "", df_filtrado['TELEFONE_PRINCIPAL'])
             
             df_exportar = pd.DataFrame({
-                'NOME': df_filtrado['NOME ELEITOR'].values,
+                'NOME': df_filtrado['NOME'].values,
                 'TELEFONE 1': telefones_export.values,
                 'TELEFONE 2': [''] * len(df_filtrado),
                 'TELEFONE 3': [''] * len(df_filtrado),
