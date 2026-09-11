@@ -7,13 +7,13 @@ import unicodedata
 import io
 
 # ====================================================
-# Configuração Nativa do Tema Claro
+# Configuração Nativa do Tema Claro e Cores Oficiais
 # ====================================================
 os.makedirs(".streamlit", exist_ok=True)
 config_path = os.path.join(".streamlit", "config.toml")
 config_content = """[theme]
 base = "light"
-primaryColor = "#460988"
+primaryColor = "#F8AE11"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F3EEF9"
 textColor = "#343334"
@@ -42,9 +42,6 @@ st.markdown("""
         color: #343334 !important;
     }
     
-    h1, h2, h3, h4, h5, h6, span, p, label {
-        color: #343334;
-    }
     h1, h2, h3 {
         color: #460988 !important;
         font-weight: 700 !important;
@@ -87,32 +84,35 @@ st.markdown("""
     /* BLOCO EXCLUSIVO: CORES DAS TAGS SELECIONADAS (MULTISELECT)                 */
     /* ========================================================================== */
 
-    /* 1. COR DO FUNDO DA TAG SELECIONADA (AMARELO OFICIAL) */
+    /* 1. COR DO FUNDO DA TAG SELECIONADA */
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"],
     span[data-baseweb="tag"],
     div[data-baseweb="tag"],
-    [data-baseweb="tag"],
-    [data-baseweb="tag"] > span {
+    [data-baseweb="tag"] {
         background-color: #F8AE11 !important;
         background: #F8AE11 !important;
         border: 1px solid #E29B05 !important;
         border-radius: 6px !important;
     }
 
-    /* 2. COR DO TEXTO DA TAG SELECIONADA (ROXO OFICIAL) */
+    /* 2. COR DO TEXTO DA TAG SELECIONADA */
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] *,
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"] *,
     span[data-baseweb="tag"] *,
     div[data-baseweb="tag"] *,
-    [data-baseweb="tag"] *,
-    [data-baseweb="tag"] span {
+    [data-baseweb="tag"] * {
         color: #460988 !important;
         font-weight: 800 !important;
         font-size: 0.88rem !important;
     }
 
     /* 3. COR DO ÍCONE "X" (FECHAR TAG) */
+    div[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg,
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"] svg,
     span[data-baseweb="tag"] svg,
     div[data-baseweb="tag"] svg,
-    [data-baseweb="tag"] svg,
-    [data-baseweb="tag"] svg path {
+    [data-baseweb="tag"] svg {
         fill: #460988 !important;
         color: #460988 !important;
     }
@@ -135,21 +135,23 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    .stButton > button {
+    /* Botão de Ação / Gerar Arquivo */
+    .stButton > button,
+    .stButton > button * {
         background-color: #460988 !important;
         color: #FFFFFF !important;
         border: 2px solid #460988 !important;
         border-radius: 8px !important;
-        font-weight: 600 !important;
-        padding: 8px 20px !important;
+        font-weight: 700 !important;
     }
     .stButton > button:hover {
         background-color: #5B0EB0 !important;
         border-color: #F8AE11 !important;
-        color: #FFFFFF !important;
     }
 
-    [data-testid="stDownloadButton"] > button {
+    /* Botão de Download */
+    [data-testid="stDownloadButton"] > button,
+    [data-testid="stDownloadButton"] > button * {
         background-color: #F8AE11 !important;
         color: #2D2505 !important;
         border: 2px solid #F8AE11 !important;
@@ -170,21 +172,19 @@ st.markdown("""
 # ====================================================
 
 EXCECOES_FEMININAS = {
-    'ABADIA', 'ALICE', 'BEATRIZ', 'CARMEM', 'CARMEN', 'CLEIDE', 'CLOE', 'DAIANE', 'DAIANI',
-    'DAYANE', 'DAYANI', 'DENISE', 'DIANE', 'DORIS', 'EDITE', 'EDITH', 'ELEN', 'ELIS', 'ELIZABETH',
-    'ELIZETE', 'EMANUELLE', 'ESTER', 'ESTHER', 'EUNICE', 'FRANCOISE', 'GLEICE', 'GLEICI',
-    'GRACE', 'HELEN', 'HELOISE', 'INEZ', 'INÊS', 'IRIS', 'ISABEL', 'ISABELE', 'ISABELLA',
-    'ISABELLE', 'IVETE', 'IVONE', 'JAQUELINE', 'JANETE', 'JOCELENE', 'JOCELYN', 'JOELMA',
-    'JOSIANE', 'JOYCE', 'JUDITE', 'JULIANE', 'KAREN', 'KATIA', 'KELLY', 'LAIS', 'LARISSA',
-    'LEIDE', 'LIDIANE', 'LILIAN', 'LILIANE', 'LIS', 'LIZ', 'LOURDES', 'LUCIANE', 'LUCIELE',
-    'LUCIENE', 'LUCIMAR', 'LUDMILA', 'LUZIA', 'MADALENA', 'MAIRA', 'MANUELA', 'MARA',
-    'MARCELA', 'MARCIA', 'MARGARETE', 'MARI', 'MARIA', 'MARIENE', 'MARILENE', 'MARILU',
-    'MARINA', 'MARISA', 'MARISTELA', 'MARIZE', 'MARLENE', 'MARLI', 'MARLY', 'MIRIAM',
-    'MIRIAN', 'MONICA', 'NADIR', 'NAIR', 'NAIRA', 'NEIDE', 'NICOLE', 'NOEMI', 'RAQUEL',
-    'REGINA', 'ROBERTA', 'ROSE', 'ROSEANE', 'ROSELI', 'ROSEMARY', 'ROSILENE', 'RUTE', 'RUTH',
-    'SALETE', 'SHIRLEY', 'SIMONE', 'SIRLEI', 'SIRLENE', 'SOLANGE', 'SONIA', 'SUELI', 'SUELY',
-    'SUZANA', 'TAIS', 'THAIS', 'TATIANE', 'TEREZA', 'VALDENICE', 'VALERIA', 'VANDETE',
-    'VANESSA', 'VERA', 'VIVIAN', 'VIVIANE', 'YASMIN', 'ZILDA', 'ZILMA', 'ZULEICA', 'ZULEIDE'
+    'ALICE', 'BEATRIZ', 'CARMEM', 'CARMEN', 'CLOE', 'DENISE', 'DORIS', 'EDITE', 'EDITH',
+    'ELEN', 'ELIS', 'ELIZABETH', 'ELIZETE', 'EMANUELLE', 'ESTER', 'ESTHER', 'EUNICE',
+    'FRANCOISE', 'GLEICE', 'GLEICI', 'GRACE', 'HELEN', 'HELOISE', 'INEZ', 'INÊS', 'IRIS',
+    'ISABEL', 'ISABELE', 'ISABELLA', 'ISABELLE', 'IVETE', 'IVONE', 'JAQUELINE', 'JANETE',
+    'JOCELENE', 'JOCELYN', 'JOELMA', 'JOYCE', 'JUDITE', 'KAREN', 'KATIA', 'KELLY', 'LAIS',
+    'LARISSA', 'LILIAN', 'LIS', 'LIZ', 'LOURDES', 'LUCIENE', 'LUDMILA', 'LUZIA', 'MADALENA',
+    'MAIRA', 'MANUELA', 'MARA', 'MARCELA', 'MARCIA', 'MARGARETE', 'MARI', 'MARIA', 'MARIENE',
+    'MARILENE', 'MARILU', 'MARINA', 'MARISA', 'MARISTELA', 'MARIZE', 'MARLENE', 'MARLI', 'MARLY',
+    'MIRIAM', 'MIRIAN', 'MONICA', 'NADIR', 'NAIR', 'NAIRA', 'NICOLE', 'NOEMI', 'RAQUEL', 'REGINA',
+    'ROBERTA', 'ROSE', 'ROSEANE', 'ROSELI', 'ROSEMARY', 'ROSILENE', 'RUTE', 'RUTH', 'SALETE',
+    'SHIRLEY', 'SIMONE', 'SIRLEI', 'SIRLENE', 'SOLANGE', 'SONIA', 'SUELI', 'SUELY', 'SUZANA',
+    'TAIS', 'THAIS', 'TEREZA', 'VALDENICE', 'VALERIA', 'VANDETE', 'VANESSA', 'VERA', 'VIVIAN',
+    'YASMIN', 'ZILDA', 'ZILMA', 'ZULEICA'
 }
 
 EXCECOES_MASCULINAS = {
@@ -217,16 +217,26 @@ def classificar_genero(nome_completo, valor_coluna_sexo=None):
         
     p_nome = partes[0]
     
+    # 1. Regras explícitas de terminações fornecidas
+    if p_nome.endswith(('ANE', 'IDE', 'GAIL')):
+        return "Feminino"
+        
+    if p_nome.endswith(('MAR', 'MAN', 'DAN', 'DAM')):
+        return "Masculino"
+    
+    # 2. Exceções mapeadas
     if p_nome in EXCECOES_MASCULINAS:
         return "Masculino"
     if p_nome in EXCECOES_FEMININAS:
         return "Feminino"
         
+    # 3. Nomes compostos fortes
     if p_nome in ['MARIA', 'ANA']:
         return "Feminino"
     if p_nome in ['JOAO', 'JOSE', 'FRANCISCO']:
         return "Masculino"
         
+    # 4. Heurísticas morfológicas de nomes em português
     if p_nome.endswith(('INA', 'ANA', 'ELA', 'AIA', 'ARA', 'ETE', 'ICE', 'ISE', 'ELLE', 'IELE', 'IA', 'CA', 'DA', 'GA', 'LA', 'MA', 'NA', 'PA', 'RA', 'SA', 'TA', 'VA', 'ZA', 'A')):
         return "Feminino"
         
@@ -240,15 +250,10 @@ def classificar_genero(nome_completo, valor_coluna_sexo=None):
 # ====================================================
 
 def classificar_e_extrair_telefones(valor_celula, ddd_padrao="63"):
-    """
-    Analisa a célula inteira de telefones e retorna:
-    (Status: 'Possui Celular' | 'Apenas Fixo' | 'Sem Telefone', Telefone Principal, Telefone Celular)
-    """
     if not valor_celula or pd.isna(valor_celula) or str(valor_celula).strip() == "" or str(valor_celula).lower() == "nan":
         return "Sem Telefone", "", ""
         
     candidatos = re.split(r'[,;/|\n\\]', str(valor_celula))
-    
     celulares = []
     fixos = []
     
@@ -257,7 +262,6 @@ def classificar_e_extrair_telefones(valor_celula, ddd_padrao="63"):
         if not digitos:
             continue
             
-        # Remove DDI 55
         if len(digitos) in (12, 13) and digitos.startswith('55'):
             digitos = digitos[2:]
             
@@ -667,9 +671,7 @@ if arquivo_upload is not None:
     # Filtros Laterais
     st.sidebar.header("🔍 Filtros de Segmentação")
 
-    # ====================================================
     # BOTÕES DE CRITÉRIO DE TELEFONIA (SEM DESCARTAR DA BASE)
-    # ====================================================
     st.sidebar.subheader("📞 Filtros de Telefonia")
     excluir_sem_telefone = st.sidebar.checkbox("Excluir contatos sem telefone", value=False)
     excluir_apenas_fixo = st.sidebar.checkbox("Excluir contatos apenas com fixo", value=False)
@@ -782,9 +784,12 @@ if arquivo_upload is not None:
         elif len(df_filtrado) == 0:
             st.error("Nenhum contato encontrado com os filtros atuais.")
         else:
+            # Seleciona o celular caso exista, senão exporta o telefone fixo
+            telefones_export = df_filtrado['TELEFONE_CELULAR'].where(df_filtrado['TELEFONE_CELULAR'] != "", df_filtrado['TELEFONE_PRINCIPAL'])
+            
             df_exportar = pd.DataFrame({
                 'NOME': df_filtrado['NOME ELEITOR'].values,
-                'TELEFONE 1': df_filtrado['TELEFONE_PRINCIPAL'].values,
+                'TELEFONE 1': telefones_export.values,
                 'TELEFONE 2': [''] * len(df_filtrado),
                 'TELEFONE 3': [''] * len(df_filtrado),
                 'LISTA': nome_lista_input.strip(),
