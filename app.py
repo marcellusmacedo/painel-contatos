@@ -135,7 +135,7 @@ st.markdown("""
         font-weight: 800 !important;
     }
 
-    /* Botão de Ação / Gerar Arquivo */
+    /* Botões Primários */
     .stButton > button,
     .stButton > button * {
         background-color: #460988 !important;
@@ -591,6 +591,14 @@ def carregar_e_limpar(arquivo):
         df['TELEFONE_PRINCIPAL'] = ""
         df['TELEFONE_CELULAR'] = ""
 
+    # Identificação de Telefones Repetidos (ignora quem não tem telefone)
+    mask_com_tel = df['TELEFONE_PRINCIPAL'] != ""
+    contagem_tel = df.loc[mask_com_tel, 'TELEFONE_PRINCIPAL'].value_counts()
+    df['QTD_REPETICOES'] = df['TELEFONE_PRINCIPAL'].map(contagem_tel).fillna(0).astype(int)
+    df['TELEFONE_REPETIDO'] = df['QTD_REPETICOES'].apply(
+        lambda x: f"Repetido ({x}x)" if x > 1 else ("Único" if x == 1 else "Sem Número")
+    )
+
     # 2. Exclusão de colunas desnecessárias
     colunas_excluir = ['NUMERO ZONA', 'MUNICIPIO', 'NOME DA MÃE DO ELEITOR', 'NOME DA MAE DO ELEITOR', 'CPF ELEITOR', 'TITULO ELEITORAL', 'ZONA', 'SECAO']
     df = df.drop(columns=[col for col in colunas_excluir if col in df.columns], errors='ignore')
@@ -674,10 +682,19 @@ if arquivo_upload is not None:
     # Filtros Laterais
     st.sidebar.header("🔍 Filtros de Segmentação")
 
-    # BOTÕES DE CRITÉRIO DE TELEFONIA (SEM DESCARTAR DA BASE)
+    # FILTROS DE TELEFONIA & DUPLICIDADES
     st.sidebar.subheader("📞 Filtros de Telefonia")
     excluir_sem_telefone = st.sidebar.checkbox("Excluir contatos sem telefone", value=False)
     excluir_apenas_fixo = st.sidebar.checkbox("Excluir contatos apenas com fixo", value=False)
+
+    filtro_duplicados = st.sidebar.selectbox(
+        "Tratamento de Telefones Repetidos:",
+        options=[
+            "Manter todos (não filtrar)",
+            "Excluir repetidos (manter 1º contato por telefone)",
+            "Mostrar APENAS contatos com telefones repetidos"
+        ]
+    )
 
     # Filtro de Bairro
     bairros_ordenados = sorted([b for b in df['BAIRRO_SETOR'].unique() if b not in ["Não Identificado", "Zona Rural", "Centro", "Centro [Estimado]"]])
@@ -726,6 +743,15 @@ if arquivo_upload is not None:
     if excluir_apenas_fixo:
         df_filtrado = df_filtrado[df_filtrado['STATUS_TELEFONE'] != 'Apenas Fixo']
 
+    # Aplicação de Repetidos (Excluir ou Destacar)
+    if filtro_duplicados == "Excluir repetidos (manter 1º contato por telefone)":
+        df_com_tel = df_filtrado[df_filtrado['TELEFONE_PRINCIPAL'] != ""].drop_duplicates(subset=['TELEFONE_PRINCIPAL'], keep='first')
+        df_sem_tel = df_filtrado[df_filtrado['TELEFONE_PRINCIPAL'] == ""]
+        df_filtrado = pd.concat([df_com_tel, df_sem_tel], ignore_index=True)
+    elif filtro_duplicados == "Mostrar APENAS contatos com telefones repetidos":
+        df_filtrado = df_filtrado[(df_filtrado['TELEFONE_PRINCIPAL'] != "") & (df_filtrado['QTD_REPETICOES'] > 1)]
+        df_filtrado = df_filtrado.sort_values(by=['TELEFONE_PRINCIPAL'])
+
     # Demais filtros
     if sel_bairros:
         df_filtrado = df_filtrado[df_filtrado['BAIRRO_SETOR'].isin(sel_bairros)]
@@ -756,8 +782,8 @@ if arquivo_upload is not None:
     c2.metric("Representatividade", f"{pct:.2f}%")
     celulares_no_filtro = (df_filtrado['STATUS_TELEFONE'] == 'Possui Celular').sum()
     c3.metric("Celulares Selecionados", f"{celulares_no_filtro:,}")
-    fixos_no_filtro = (df_filtrado['STATUS_TELEFONE'] == 'Apenas Fixo').sum()
-    c4.metric("Fixos Selecionados", f"{fixos_no_filtro:,}")
+    repetidos_no_filtro = (df_filtrado['QTD_REPETICOES'] > 1).sum()
+    c4.metric("Contatos Repetidos", f"{repetidos_no_filtro:,}")
 
     if ativar_filtro_idade:
         if idade_inicial == idade_final:
@@ -767,49 +793,116 @@ if arquivo_upload is not None:
 
     # Tabela Prévia
     st.subheader("📋 Prévia dos Registros Filtrados")
-    df_preview = df_filtrado[['NOME', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 'SEXO', 'PROFISSÃO', 'BAIRRO_SETOR', 'IDADE']].copy()
+    df_preview = df_filtrado[['NOME', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 'TELEFONE_REPETIDO', 'SEXO', 'PROFISSÃO', 'BAIRRO_SETOR', 'IDADE']].copy()
     df_preview['IDADE'] = df_preview['IDADE'].apply(lambda x: f"{int(x)} anos" if pd.notna(x) else "Não informada")
     st.dataframe(df_preview.head(100), use_container_width=True)
 
-    # Seção de Exportação Personalizada
+    # ====================================================
+    # OPÇÕES DE EXPORTAÇÃO (DISPARO & BASE COMPLETA)
+    # ====================================================
     st.markdown("---")
-    st.subheader("📤 Exportar Lista Segmentada")
+    st.subheader("📤 Opções de Exportação")
 
-    col_nome_lista, col_marcador = st.columns(2)
-    with col_nome_lista:
-        nome_lista_input = st.text_input("Qual o nome desta LISTA? (Ex: contatos_mulheres, advogados, etc.):", value="")
-    with col_marcador:
-        st.text_input("MARCADOR:", value="ListaE", disabled=True)
+    tab_disparo, tab_completa = st.tabs(["📋 Formato de Disparo (Mailing)", "📊 Planilha Completa (Todas as Colunas)"])
 
-    if st.button("Gerar Arquivo para Download"):
-        if not nome_lista_input.strip():
-            st.warning("Informe o nome da LISTA antes de baixar a planilha.")
-        elif len(df_filtrado) == 0:
-            st.error("Nenhum contato encontrado com os filtros atuais.")
-        else:
-            # Seleciona o celular caso exista, senão exporta o telefone fixo
-            telefones_export = df_filtrado['TELEFONE_CELULAR'].where(df_filtrado['TELEFONE_CELULAR'] != "", df_filtrado['TELEFONE_PRINCIPAL'])
-            
-            df_exportar = pd.DataFrame({
-                'NOME': df_filtrado['NOME'].values,
-                'TELEFONE 1': telefones_export.values,
-                'TELEFONE 2': [''] * len(df_filtrado),
-                'TELEFONE 3': [''] * len(df_filtrado),
-                'LISTA': nome_lista_input.strip(),
-                'MARCADOR': 'ListaE'
-            })
-
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                df_exportar.to_excel(writer, index=False, sheet_name="Contatos")
-            buffer.seek(0)
-
-            st.success(f"Tudo pronto! {len(df_exportar)} contatos preparados.")
-            st.download_button(
-                label=f"⬇️ Baixar Planilha ({nome_lista_input.strip()}.xlsx)",
-                data=buffer,
-                file_name=f"{nome_lista_input.strip().lower().replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # ----------------------------------------------------
+    # ABA 1: Formato de Disparo (com Marcador Editável)
+    # ----------------------------------------------------
+    with tab_disparo:
+        st.markdown("Gera o arquivo padronizado para ferramentas de disparo em massa e automação.")
+        
+        col_nome_lista, col_marcador = st.columns(2)
+        with col_nome_lista:
+            nome_lista_input = st.text_input(
+                "Nome da LISTA (Ex: contatos_mulheres, advogados_centro):",
+                value="",
+                key="nome_lista_disparo"
             )
+        with col_marcador:
+            marcador_input = st.text_input(
+                "MARCADOR (Tag personalizada):",
+                value="ListaE",
+                key="marcador_disparo"
+            )
+
+        if st.button("Gerar Lista de Disparo", key="btn_disparo"):
+            if not nome_lista_input.strip():
+                st.warning("Informe o nome da LISTA antes de gerar o arquivo.")
+            elif not marcador_input.strip():
+                st.warning("Informe o MARCADOR antes de gerar o arquivo.")
+            elif len(df_filtrado) == 0:
+                st.error("Nenhum contato encontrado com os filtros atuais.")
+            else:
+                telefones_export = df_filtrado['TELEFONE_CELULAR'].where(
+                    df_filtrado['TELEFONE_CELULAR'] != "",
+                    df_filtrado['TELEFONE_PRINCIPAL']
+                )
+
+                df_export_disparo = pd.DataFrame({
+                    'NOME': df_filtrado['NOME'].values,
+                    'TELEFONE 1': telefones_export.values,
+                    'TELEFONE 2': [''] * len(df_filtrado),
+                    'TELEFONE 3': [''] * len(df_filtrado),
+                    'LISTA': nome_lista_input.strip(),
+                    'MARCADOR': marcador_input.strip()
+                })
+
+                buffer_disp = io.BytesIO()
+                with pd.ExcelWriter(buffer_disp, engine='openpyxl') as writer:
+                    df_export_disparo.to_excel(writer, index=False, sheet_name="Contatos")
+                buffer_disp.seek(0)
+
+                st.success(f"Tudo pronto! {len(df_export_disparo):,} contatos preparados no formato de disparo.")
+                st.download_button(
+                    label=f"⬇️ Baixar Lista de Disparo ({nome_lista_input.strip()}.xlsx)",
+                    data=buffer_disp,
+                    file_name=f"{nome_lista_input.strip().lower().replace(' ', '_')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_disparo"
+                )
+
+    # ----------------------------------------------------
+    # ABA 2: Planilha Completa Filtrada (Todas as Colunas)
+    # ----------------------------------------------------
+    with tab_completa:
+        st.markdown("Exporta a base com **todas as colunas criadas e enriquecidas** (Bairro, Sexo, Idade, Status do Telefone, Repetições, etc.).")
+        
+        col_nome_comp, _ = st.columns([2, 1])
+        with col_nome_comp:
+            nome_arquivo_completo = st.text_input(
+                "Nome do arquivo completo:",
+                value="base_filtrada_completa",
+                key="nome_base_completa"
+            )
+
+        if st.button("Gerar Planilha Completa", key="btn_completa"):
+            if not nome_arquivo_completo.strip():
+                st.warning("Informe o nome do arquivo antes de gerar.")
+            elif len(df_filtrado) == 0:
+                st.error("Nenhum contato encontrado com os filtros atuais.")
+            else:
+                # Reorganiza para colocar as colunas enriquecidas prioritárias na frente
+                cols_prioritarias = [
+                    'NOME', 'SEXO', 'IDADE', 'STATUS_TELEFONE', 'TELEFONE_PRINCIPAL', 
+                    'TELEFONE_CELULAR', 'TELEFONE_REPETIDO', 'QTD_REPETICOES', 
+                    'PROFISSÃO', 'BAIRRO_SETOR'
+                ]
+                cols_existentes = [c for c in cols_prioritarias if c in df_filtrado.columns]
+                outras_cols = [c for c in df_filtrado.columns if c not in cols_existentes]
+                df_export_completo = df_filtrado[cols_existentes + outras_cols].copy()
+
+                buffer_comp = io.BytesIO()
+                with pd.ExcelWriter(buffer_comp, engine='openpyxl') as writer:
+                    df_export_completo.to_excel(writer, index=False, sheet_name="Base_Filtrada")
+                buffer_comp.seek(0)
+
+                st.success(f"Tudo pronto! {len(df_export_completo):,} registros completos exportados com todas as colunas.")
+                st.download_button(
+                    label=f"⬇️ Baixar Planilha Completa ({nome_arquivo_completo.strip()}.xlsx)",
+                    data=buffer_comp,
+                    file_name=f"{nome_arquivo_completo.strip().lower().replace(' ', '_')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="dl_completa"
+                )
 else:
     st.info("Suba sua planilha acima para visualizar os dados, filtros e estatísticas.")
